@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 import os
 
-DATA_FILE = 'project_good_habits\habits.json'
+DATA_FILE = 'project_good_habits\\habits.json'
 
 class HabitTracker:
     def __init__(self, root):
@@ -13,14 +13,13 @@ class HabitTracker:
         self.root.geometry("800x600")
         self.root.update_idletasks()  # Для правильного центрирования
         
-
         # Загрузка данных
         self.habits = self.load_data()
         self.current_date = datetime.now().date()
         
         self.setup_ui()
         self.refresh_display()
-        
+
 
     # Загрузка привычек из файла формата JSON
     def load_data(self):
@@ -29,17 +28,16 @@ class HabitTracker:
                 with open(DATA_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     return {k: v for k, v in data.items()}
-                
-            except FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError:     # Частые ошибки при работе с JSON.
+            except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
                 return {}
         return {}
-    
+
 
     # Сохранение привычек в файле формата JSON
     def save_data(self):
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.habits, f, ensure_ascii=False, indent=2)
-    
+
 
     # Пользовательский интерфейс приложения.
     def setup_ui(self):
@@ -82,11 +80,12 @@ class HabitTracker:
 
 
         # Кнопки:
-        # Кнопка "Добавить привычку"
+
+        # "Добавить привычку"
         tk.Button(btn_frame, text="➕ Добавить\nпривычку", command=self.add_habit, 
                 bg="#4CAF50", fg="white", font=("Arial", 11, "bold"), width=14, height=2).pack(pady=(0,10))
 
-        # Кнопки: Пред. день + След. день
+        # Пред. день + След. день
         nav_frame = tk.Frame(btn_frame)
         nav_frame.pack(pady=5)
 
@@ -95,15 +94,13 @@ class HabitTracker:
         tk.Button(nav_frame, text="→", command=self.next_day, 
                 bg="#2196F3", fg="white", font=("Arial", 10, "bold"), width=7).pack(side=tk.LEFT, padx=2)
 
-        # Кнопка "Сегодня"
+        # "Сегодня"
         tk.Button(btn_frame, text="📅 Сегодня", command=self.today, 
                 bg="#FF9800", fg="white", font=("Arial", 11, "bold"), width=14, height=2).pack(pady=(5,0))
         
         # Контекстное меню
         self.context_menu = tk.Menu(self.root, tearoff=0)
-        self.context_menu.add_command(label="Отметить соблюдение", command=self.mark_done)
-        self.context_menu.add_command(label="Редактировать название привычки", command=self.edit_habit)
-        self.context_menu.add_command(label="Удалить", command=self.delete_habit)
+
         self.tree.bind("<Button-3>", self.show_context_menu)
 
 
@@ -127,7 +124,7 @@ class HabitTracker:
                 f"{percent:.1f}%",
                 "✓" if done_today else "✗"
             ))
-    
+
 
     # Расчёт текущей серии дней
     def calculate_streak(self, habit_name):
@@ -142,7 +139,7 @@ class HabitTracker:
             else:
                 break
         return streak
-    
+
 
     # Процент выполнения за 30 дней
     def calculate_percent(self, habit_name):
@@ -166,7 +163,7 @@ class HabitTracker:
                 continue
         
         return sum(recent) / len(recent) * 100
-    
+
 
     # Соблюдена ли привычка сегодня.
     def is_done_today(self, habit_name):
@@ -177,7 +174,7 @@ class HabitTracker:
                 return entry['done']
         return False
     
-    
+
     # Всплывающее окно по центру основного окна
     def show_centered_dialog(self, title, message, width=400, height=200, buttons=None):
         dialog = tk.Toplevel(self.root)
@@ -239,49 +236,69 @@ class HabitTracker:
                 self.refresh_display()
                 self.show_centered_dialog("✅ Готово", f"Добавлена привычка: {name}")
 
-    
-    def mark_done(self):
+
+    # Отметить/Отменить соблюдение
+    def toggle_done(self):
         selection = self.tree.selection()
         if selection:
             habit = self.tree.item(selection)['values'][0]
             today_str = self.current_date.strftime('%Y-%m-%d')
             
             data = self.habits.get(habit, [])
-            # Заменяем или добавляем запись за сегодня
-            for i, entry in enumerate(data):
-                if entry['date'] == today_str:
-                    data[i]['done'] = True
-                    break
+            done_today = self.is_done_today(habit)
+            
+            # Если выполнено сегодня - отменяем, иначе отмечаем
+            if done_today:
+                # Удаляем запись за сегодня
+                data = [entry for entry in data if entry['date'] != today_str]
             else:
+                # Добавляем запись за сегодня как выполненную
                 data.append({'date': today_str, 'done': True})
             
+            self.habits[habit] = data
             self.save_data()
             self.refresh_display()
-    
+
 
     # Переключение на предыдущий день
     def prev_day(self):
         self.current_date -= timedelta(days=1)
         self.refresh_display()
     
+
     # Переключение на следующий день
     def next_day(self):
         self.current_date += timedelta(days=1)
         self.refresh_display()
-    
+
 
     # Возвращаемся на сегодня.
     def today(self):
         self.current_date = datetime.now().date()
         self.refresh_display()
-    
 
-    # Показывает контектное меню при нажатии правой кнопки мыши после выделения привычки нажатием левой.
+
+    # Показывает контекстное меню при нажатии правой кнопки мыши после выделения привычки нажатием левой.
     def show_context_menu(self, event):
         selection = self.tree.selection()
         if selection:
+            habit = self.tree.item(selection)['values'][0]
+            done_today = self.is_done_today(habit)
+            
+            # Очищаем меню и добавляем нужную команду
+            self.context_menu.delete(0, tk.END)
+            
+            if done_today:
+                self.context_menu.add_command(label="❌ Отменить отметку", command=self.toggle_done)
+            else:
+                self.context_menu.add_command(label="✅ Отметить соблюдение", command=self.toggle_done)
+            
+            self.context_menu.add_separator()
+            self.context_menu.add_command(label="✏️ Редактировать название привычки", command=self.edit_habit)
+            self.context_menu.add_command(label="🗑️ Удалить", command=self.delete_habit)
+            
             self.context_menu.post(event.x_root, event.y_root)
-    
+
 
     # Редактирование названия привычки
     def edit_habit(self):
@@ -295,11 +312,11 @@ class HabitTracker:
                 if new_name in self.habits:
                     self.show_centered_dialog("⚠️ Ошибка", f"Название '{new_name}' уже занято!")
                 else:
-                    self.habits[new_name] = self.habits.pop(f"{old_name}")
+                    self.habits[new_name] = self.habits.pop(old_name)
                     self.save_data()
                     self.refresh_display()
                     self.show_centered_dialog("✅ Готово", f"Переименовано в: {new_name}")
-    
+
 
     # Удалить привычку
     def delete_habit(self):
@@ -311,7 +328,7 @@ class HabitTracker:
                 try:
                     del self.habits[habit]
                 except KeyError:
-                    del self.habits[f"{habit}"]
+                    del self.habits[habit]
 
                 self.save_data()
                 self.refresh_display()
