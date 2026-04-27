@@ -4,7 +4,12 @@ import json
 from datetime import datetime, timedelta
 import os
 
-DATA_FILE = 'project_good_habits\\habits.json'
+
+# Для того, чтобы не возникала ошибка с поиском директории.
+base_path = os.path.dirname(__file__)
+file_path = os.path.join(base_path, 'habits.json')
+
+DATA_FILE = file_path
 
 class HabitTracker:
     def __init__(self, root):
