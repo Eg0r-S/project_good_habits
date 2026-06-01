@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox, simpledialog
 import json
 from datetime import datetime, timedelta
 import os
+import sys
 
 
 # Для того, чтобы не возникала ошибка с поиском директории.
@@ -147,27 +148,40 @@ class HabitTracker:
 
 
     # Процент выполнения за 30 дней
+
     def calculate_percent(self, habit_name):
         data = self.habits.get(habit_name, [])
         if not data:
             return 0
         
-        recent = []
-        target_date = self.current_date
-        for _ in range(30):
-            recent.append(False)
-            target_date -= timedelta(days=1)
-        
-        for entry in data[-30:]:  # Последние 30 дней
+        # Парсинг даты всех записей
+        valid_entries = []
+        for entry in data:
             try:
                 entry_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
+                # Берем только записи за последние 30 дней
                 if self.current_date - timedelta(days=30) <= entry_date <= self.current_date:
-                    idx = (self.current_date - entry_date).days
-                    recent[29 - idx] = entry['done']
+                    valid_entries.append((entry_date, entry['done']))
             except:
                 continue
+
+        if not valid_entries:
+            return 0
+
+        # Дата самой старой записи в окне
+        oldest_date = min(entry_date for entry_date, _ in valid_entries)
         
-        return sum(recent) / len(recent) * 100
+        # Количество дней прошедших с даты последнего выполнения до сегодня (минимум 1 день)
+        days_tracked = (self.current_date - oldest_date).days + 1
+
+
+        # Ограничение окна сверху на случай аномалий
+        days_tracked = min(days_tracked, 30)
+
+        #Расчёт процента
+        successful_days = sum(1 for _, done in valid_entries if done)
+        return round((successful_days / days_tracked) * 100, 1)
+
 
 
     # Соблюдена ли привычка сегодня.
@@ -346,6 +360,17 @@ class HabitTracker:
             self.show_centered_dialog("🗑️ Удалить привычку", 
                                     f"Удалить привычку '{habit}'?\nВсе данные будут потеряны!",
                                     buttons=buttons)
+
+
+# Нахождение папки в которой запускается .exe
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+# Точный путь к JSON.
+json_path = os.path.join(application_path, 'data.json')
+
 
 root = tk.Tk()
 app = HabitTracker(root)
