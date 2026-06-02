@@ -5,12 +5,16 @@ from datetime import datetime, timedelta
 import os
 import sys
 
+# Нахождение папки в которой запускается .exe
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
 
-# Для того, чтобы не возникала ошибка с поиском директории.
-base_path = os.path.dirname(__file__)
-file_path = os.path.join(base_path, 'habits.json')
+# Точный путь к файлу JSON.
+json_path = os.path.join(application_path, 'data.json')
 
-DATA_FILE = file_path
+DATA_FILE = json_path
 
 class HabitTracker:
     def __init__(self, root):
@@ -31,9 +35,9 @@ class HabitTracker:
     def load_data(self):
         if os.path.exists(DATA_FILE):
             try:
-                with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    return {k: v for k, v in data.items()}
+                with open(DATA_FILE, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+                    return {key: value for key, value in data.items()}
             except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
                 return {}
         return {}
@@ -41,8 +45,8 @@ class HabitTracker:
 
     # Сохранение привычек в файле формата JSON
     def save_data(self):
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.habits, f, ensure_ascii=False, indent=2)
+        with open(DATA_FILE, 'w', encoding='utf-8') as file:
+            json.dump(self.habits, file, ensure_ascii=False, indent=2)
 
 
     # Пользовательский интерфейс приложения.
@@ -86,7 +90,6 @@ class HabitTracker:
 
 
         # Кнопки:
-
         # "Добавить привычку"
         tk.Button(btn_frame, text="➕ Добавить\nпривычку", command=self.add_habit, 
                 bg="#4CAF50", fg="white", font=("Arial", 11, "bold"), width=14, height=2).pack(pady=(0,10))
@@ -112,7 +115,6 @@ class HabitTracker:
 
     # Обновление отображения
     def refresh_display(self):
-
         # Очистка
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -135,53 +137,43 @@ class HabitTracker:
     # Расчёт текущей серии дней
     def calculate_streak(self, habit_name):
         data = self.habits.get(habit_name, [])
+        done_dates = {
+            item['date'] for item in data if item.get('done')
+        }
+        
         streak = 0
-        for i in range(len(data)-1, -1, -1):
-            if data[i]['date'] == self.current_date.strftime('%Y-%m-%d'):
-                streak += 1
-                break
-            elif data[i]['done']:
-                streak += 1
-            else:
-                break
+        check_date = self.current_date
+        
+        while check_date.strftime('%Y-%m-%d') in done_dates:
+            streak += 1
+            check_date -= timedelta(days=1)  # Шаг назад на 1 день
+            
         return streak
 
 
     # Процент выполнения за 30 дней
-
     def calculate_percent(self, habit_name):
         data = self.habits.get(habit_name, [])
         if not data:
-            return 0
+            return 0.0
         
-        # Парсинг даты всех записей
-        valid_entries = []
+        # Строгий интервал в 30 дней от сегодня включительно.
+        start_date = self.current_date - timedelta(days=29)
+        successful_days_set = set()
+        
         for entry in data:
             try:
                 entry_date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
-                # Берем только записи за последние 30 дней
-                if self.current_date - timedelta(days=30) <= entry_date <= self.current_date:
-                    valid_entries.append((entry_date, entry['done']))
-            except:
+
+                if start_date <= entry_date <= self.current_date and entry.get('done'):
+                    successful_days_set.add(entry_date)
+            except (ValueError, KeyError):
                 continue
 
-        if not valid_entries:
-            return 0
-
-        # Дата самой старой записи в окне
-        oldest_date = min(entry_date for entry_date, _ in valid_entries)
+        successful_days_count = len(successful_days_set)
+        total_days_in_window = 30
         
-        # Количество дней прошедших с даты последнего выполнения до сегодня (минимум 1 день)
-        days_tracked = (self.current_date - oldest_date).days + 1
-
-
-        # Ограничение окна сверху на случай аномалий
-        days_tracked = min(days_tracked, 30)
-
-        #Расчёт процента
-        successful_days = sum(1 for _, done in valid_entries if done)
-        return round((successful_days / days_tracked) * 100, 1)
-
+        return round((successful_days_count / total_days_in_window) * 100, 1)
 
 
     # Соблюдена ли привычка сегодня.
@@ -266,12 +258,9 @@ class HabitTracker:
             data = self.habits.get(habit, [])
             done_today = self.is_done_today(habit)
             
-            # Если выполнено сегодня - отменяем, иначе отмечаем
             if done_today:
-                # Удаляем запись за сегодня
                 data = [entry for entry in data if entry['date'] != today_str]
             else:
-                # Добавляем запись за сегодня как выполненную
                 data.append({'date': today_str, 'done': True})
             
             self.habits[habit] = data
@@ -284,12 +273,10 @@ class HabitTracker:
         self.current_date -= timedelta(days=1)
         self.refresh_display()
     
-
     # Переключение на следующий день
     def next_day(self):
         self.current_date += timedelta(days=1)
         self.refresh_display()
-
 
     # Возвращаемся на сегодня.
     def today(self):
@@ -304,7 +291,6 @@ class HabitTracker:
             habit = self.tree.item(selection)['values'][0]
             done_today = self.is_done_today(habit)
             
-            # Очищаем меню и добавляем нужную команду
             self.context_menu.delete(0, tk.END)
             
             if done_today:
@@ -342,7 +328,7 @@ class HabitTracker:
         selection = self.tree.selection()
         if selection:
             habit = self.tree.item(selection)['values'][0]
-            
+
             def confirm_delete():
                 try:
                     del self.habits[habit]
@@ -360,16 +346,6 @@ class HabitTracker:
             self.show_centered_dialog("🗑️ Удалить привычку", 
                                     f"Удалить привычку '{habit}'?\nВсе данные будут потеряны!",
                                     buttons=buttons)
-
-
-# Нахождение папки в которой запускается .exe
-if getattr(sys, 'frozen', False):
-    application_path = os.path.dirname(sys.executable)
-else:
-    application_path = os.path.dirname(os.path.abspath(__file__))
-
-# Точный путь к JSON.
-json_path = os.path.join(application_path, 'data.json')
 
 
 root = tk.Tk()
