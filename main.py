@@ -12,7 +12,7 @@ else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 
 # Точный путь к файлу JSON.
-json_path = os.path.join(application_path, 'data.json')
+json_path = os.path.join(application_path, 'habits.json')
 
 DATA_FILE = json_path
 
